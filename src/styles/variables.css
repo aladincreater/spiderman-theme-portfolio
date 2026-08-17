@@ -1,0 +1,48 @@
+:root {
+  /* Color System */
+  --color-bg-dark: #0a0a0c;
+  --color-bg-surface: #121218;
+  --color-bg-elevated: #1a1a24;
+  --color-bg-panel: #161620;
+  
+  --color-spidey-red: #e62429;
+  --color-spidey-red-bright: #ff2a30;
+  --color-spidey-red-glow: rgba(230, 36, 41, 0.4);
+  --color-spidey-red-subtle: rgba(230, 36, 41, 0.15);
+  --color-spidey-red-dark: #9e0b11;
+  
+  --color-spidey-blue: #00f0ff;
+  --color-spidey-blue-glow: rgba(0, 240, 255, 0.35);
+  --color-spidey-blue-subtle: rgba(0, 240, 255, 0.12);
+  --color-spidey-blue-dark: #005580;
+
+  --color-text-main: #ffffff;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-dark: #0f172a;
+  
+  --color-border-ink: #262636;
+  --color-border-highlight: #3b3b54;
+  --color-border-red: #ff2a30;
+  
+  /* Typography */
+  --font-comic: 'Bebas Neue', cursive, sans-serif;
+  --font-body: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Fira Code', monospace;
+  
+  /* Comic Shadows & Borders */
+  --shadow-comic: 4px 4px 0px #000000;
+  --shadow-comic-red: 5px 5px 0px var(--color-spidey-red);
+  --shadow-comic-blue: 5px 5px 0px var(--color-spidey-blue);
+  --glow-red: 0 0 25px rgba(230, 36, 41, 0.35);
+  --glow-blue: 0 0 25px rgba(0, 240, 255, 0.35);
+  
+  /* Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  
+  /* Layout */
+  --max-width: 1320px;
+  --nav-height: 80px;
+}
