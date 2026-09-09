@@ -8,7 +8,8 @@ let globalAudioCtx: AudioContext | null = null;
 const listeners = new Set<() => void>();
 
 let globalIsPlaying = false;
-let globalIsMuted = true;
+let globalIsMuted = false;
+let autoplayAttempted = false;
 
 function getAudioSrc(): string {
   if (typeof window === "undefined") return "sunflower.mp3";
@@ -17,22 +18,74 @@ function getAudioSrc(): string {
   return `${cleanBase}sunflower.mp3`;
 }
 
+function startAudioPlayback() {
+  if (!globalAudio) return;
+
+  globalAudio.muted = false;
+  globalAudio.volume = 0.45;
+  const playPromise = globalAudio.play();
+
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        globalIsPlaying = true;
+        globalIsMuted = false;
+        notifyListeners();
+        removeInteractionListeners();
+      })
+      .catch(() => {
+        // Autoplay policy prevented immediate playback without gesture, keep listeners active
+      });
+  }
+}
+
+const interactionEvents = ["click", "pointerdown", "touchstart", "scroll", "keydown", "wheel", "mousemove"];
+
+function onUserInteraction() {
+  if (globalAudio && !globalIsPlaying) {
+    startAudioPlayback();
+  }
+  removeInteractionListeners();
+}
+
+function attachInteractionListeners() {
+  if (typeof window === "undefined") return;
+  interactionEvents.forEach((ev) => {
+    window.addEventListener(ev, onUserInteraction, { once: true, passive: true });
+  });
+}
+
+function removeInteractionListeners() {
+  if (typeof window === "undefined") return;
+  interactionEvents.forEach((ev) => {
+    window.removeEventListener(ev, onUserInteraction);
+  });
+}
+
 function initGlobalAudio() {
   if (typeof window === "undefined" || globalAudio) return;
 
   const src = getAudioSrc();
   globalAudio = new Audio(src);
   globalAudio.loop = true;
-  globalAudio.volume = 0.5;
+  globalAudio.volume = 0.45;
   globalAudio.preload = "auto";
 
+  let savedMuted: boolean | null = null;
   try {
     const saved = localStorage.getItem(AUDIO_STORAGE_KEY);
     if (saved !== null) {
-      globalIsMuted = JSON.parse(saved);
+      savedMuted = JSON.parse(saved);
     }
   } catch {
+    savedMuted = null;
+  }
+
+  // If user explicitly muted in a previous session, remember it; otherwise default to playing
+  if (savedMuted === true) {
     globalIsMuted = true;
+  } else {
+    globalIsMuted = false;
   }
 
   globalAudio.addEventListener("play", () => {
@@ -51,10 +104,17 @@ function initGlobalAudio() {
   });
 
   globalAudio.addEventListener("error", (e) => {
-    console.error("Audio playback error:", e, globalAudio?.error);
+    console.warn("Audio playback notice:", e);
     globalIsPlaying = false;
     notifyListeners();
   });
+
+  // If not explicitly muted, auto-start playback as soon as user enters the website
+  if (!globalIsMuted && !autoplayAttempted) {
+    autoplayAttempted = true;
+    startAudioPlayback();
+    attachInteractionListeners();
+  }
 }
 
 function notifyListeners() {

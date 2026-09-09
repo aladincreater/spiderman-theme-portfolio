@@ -8,10 +8,13 @@ import { Projects } from "./components/projects/Projects";
 import { Contact } from "./components/contact/Contact";
 import { Footer } from "./components/layout/Footer";
 import { SpiderCursor } from "./components/effects/SpiderCursor";
+import { useWebAudio } from "./hooks/useWebAudio";
 import "./styles/globals.css";
 
 export const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<string>("hero");
+  // Initialize audio controller as soon as the user enters
+  useWebAudio();
 
   // IntersectionObserver for tracking active section in navigation
   useEffect(() => {
