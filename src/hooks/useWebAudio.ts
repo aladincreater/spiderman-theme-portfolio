@@ -1,84 +1,137 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const AUDIO_STORAGE_KEY = "spidey_portfolio_music_muted";
-const BG_MUSIC_SRC = "/sunflower.mp3";
 
-export function useWebAudio() {
-  const [isMuted, setIsMuted] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(AUDIO_STORAGE_KEY);
-      return saved !== null ? JSON.parse(saved) : true; // Default muted for browser policy
+// Singleton background audio element
+let globalAudio: HTMLAudioElement | null = null;
+let globalAudioCtx: AudioContext | null = null;
+const listeners = new Set<() => void>();
+
+let globalIsPlaying = false;
+let globalIsMuted = true;
+
+function getAudioSrc(): string {
+  if (typeof window === "undefined") return "sunflower.mp3";
+  const baseUrl = import.meta.env.BASE_URL || "./";
+  const cleanBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  return `${cleanBase}sunflower.mp3`;
+}
+
+function initGlobalAudio() {
+  if (typeof window === "undefined" || globalAudio) return;
+
+  const src = getAudioSrc();
+  globalAudio = new Audio(src);
+  globalAudio.loop = true;
+  globalAudio.volume = 0.5;
+  globalAudio.preload = "auto";
+
+  try {
+    const saved = localStorage.getItem(AUDIO_STORAGE_KEY);
+    if (saved !== null) {
+      globalIsMuted = JSON.parse(saved);
     }
-    return true;
+  } catch {
+    globalIsMuted = true;
+  }
+
+  globalAudio.addEventListener("play", () => {
+    globalIsPlaying = true;
+    notifyListeners();
   });
 
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
+  globalAudio.addEventListener("pause", () => {
+    globalIsPlaying = false;
+    notifyListeners();
+  });
 
-  // Initialize Background Audio Element
+  globalAudio.addEventListener("ended", () => {
+    globalIsPlaying = false;
+    notifyListeners();
+  });
+
+  globalAudio.addEventListener("error", (e) => {
+    console.error("Audio playback error:", e, globalAudio?.error);
+    globalIsPlaying = false;
+    notifyListeners();
+  });
+}
+
+function notifyListeners() {
+  listeners.forEach((listener) => listener());
+}
+
+function getGlobalAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (!globalAudioCtx) {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AudioCtx) {
+      globalAudioCtx = new AudioCtx();
+    }
+  }
+  if (globalAudioCtx && globalAudioCtx.state === "suspended") {
+    globalAudioCtx.resume().catch(() => {});
+  }
+  return globalAudioCtx;
+}
+
+export function useWebAudio() {
+  const [, setTick] = useState(0);
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const audio = new Audio(BG_MUSIC_SRC);
-    audio.loop = true;
-    audio.volume = 0.45; // Smooth comfortable volume level
-    bgAudioRef.current = audio;
-
-    const handleEnded = () => setIsPlaying(false);
-    audio.addEventListener("ended", handleEnded);
-
+    initGlobalAudio();
+    const update = () => setTick((t) => t + 1);
+    listeners.add(update);
     return () => {
-      audio.removeEventListener("ended", handleEnded);
-      audio.pause();
+      listeners.delete(update);
     };
-  }, []);
-
-  const getAudioContext = useCallback(() => {
-    if (typeof window === "undefined") return null;
-    if (!audioCtxRef.current) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        audioCtxRef.current = new AudioCtx();
-      }
-    }
-    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume();
-    }
-    return audioCtxRef.current;
   }, []);
 
   // Toggle Music Play/Pause & Mute
   const toggleMute = useCallback(() => {
-    const audio = bgAudioRef.current;
+    initGlobalAudio();
+    const audio = globalAudio;
+    if (!audio) return;
 
-    setIsMuted((prev) => {
-      const nextMuted = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(nextMuted));
+    if (globalIsPlaying) {
+      audio.pause();
+      globalIsMuted = true;
+      globalIsPlaying = false;
+      try {
+        localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(true));
+      } catch {}
+      notifyListeners();
+    } else {
+      audio.currentTime = audio.currentTime || 0;
+      audio.volume = 0.5;
+      audio.muted = false;
+      
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            globalIsMuted = false;
+            globalIsPlaying = true;
+            try {
+              localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(false));
+            } catch {}
+            notifyListeners();
+          })
+          .catch((err) => {
+            console.warn("Autoplay blocked or playback error:", err);
+            globalIsPlaying = false;
+            notifyListeners();
+          });
       }
-
-      if (audio) {
-        if (nextMuted) {
-          audio.pause();
-          setIsPlaying(false);
-        } else {
-          audio.play()
-            .then(() => setIsPlaying(true))
-            .catch(() => {
-              // Autoplay policy prevented playback, keep state consistent
-              setIsPlaying(false);
-            });
-        }
-      }
-      return nextMuted;
-    });
+    }
   }, []);
 
   // Web Shooter "THWIP!" sound synthesizer
   const playThwip = useCallback(() => {
     try {
-      const ctx = getAudioContext();
+      const ctx = getGlobalAudioContext();
       if (!ctx) return;
 
       const now = ctx.currentTime;
@@ -100,12 +153,12 @@ export function useWebAudio() {
     } catch {
       // Ignore audio errors gracefully
     }
-  }, [getAudioContext]);
+  }, []);
 
   // Comic Click Sound
   const playClick = useCallback(() => {
     try {
-      const ctx = getAudioContext();
+      const ctx = getGlobalAudioContext();
       if (!ctx) return;
 
       const now = ctx.currentTime;
@@ -127,12 +180,12 @@ export function useWebAudio() {
     } catch {
       // Graceful fallback
     }
-  }, [getAudioContext]);
+  }, []);
 
   // Spider-Sense Pulse Sound
   const playSensePulse = useCallback(() => {
     try {
-      const ctx = getAudioContext();
+      const ctx = getGlobalAudioContext();
       if (!ctx) return;
 
       const now = ctx.currentTime;
@@ -155,11 +208,11 @@ export function useWebAudio() {
     } catch {
       // Graceful fallback
     }
-  }, [getAudioContext]);
+  }, []);
 
   return {
-    isMuted,
-    isPlaying,
+    isMuted: globalIsMuted,
+    isPlaying: globalIsPlaying,
     toggleMute,
     playThwip,
     playClick,
@@ -171,3 +224,4 @@ export function useWebAudio() {
     },
   };
 }
+
