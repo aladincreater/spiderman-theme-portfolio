@@ -8,12 +8,13 @@ import { Projects } from "./components/projects/Projects";
 import { Contact } from "./components/contact/Contact";
 import { Footer } from "./components/layout/Footer";
 import { SpiderCursor } from "./components/effects/SpiderCursor";
+import { SpiderIntroOverlay } from "./components/effects/SpiderIntroOverlay";
 import { useWebAudio } from "./hooks/useWebAudio";
 import "./styles/globals.css";
 
 export const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<string>("hero");
-  // Initialize audio controller as soon as the user enters
+  // Initialize audio controller
   useWebAudio();
 
   // IntersectionObserver for tracking active section in navigation
@@ -43,6 +44,9 @@ export const App: React.FC = () => {
 
   return (
     <div className="portfolio-app-root">
+      {/* Cinematic Spider-Verse Entry Gate to guarantee audio playback */}
+      <SpiderIntroOverlay />
+
       {/* Custom Spider Desktop Cursor */}
       <SpiderCursor />
 

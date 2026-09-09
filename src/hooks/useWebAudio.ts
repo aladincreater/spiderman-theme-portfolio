@@ -270,10 +270,46 @@ export function useWebAudio() {
     }
   }, []);
 
+  const playMusic = useCallback(() => {
+    initGlobalAudio();
+    const audio = globalAudio;
+    if (!audio) return;
+    audio.muted = false;
+    audio.volume = 0.45;
+    const p = audio.play();
+    if (p !== undefined) {
+      p.then(() => {
+        globalIsMuted = false;
+        globalIsPlaying = true;
+        try {
+          localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(false));
+        } catch {}
+        notifyListeners();
+      }).catch((e) => {
+        console.warn("Playback error:", e);
+      });
+    }
+  }, []);
+
+
+  const pauseMusic = useCallback(() => {
+    const audio = globalAudio;
+    if (!audio) return;
+    audio.pause();
+    globalIsMuted = true;
+    globalIsPlaying = false;
+    try {
+      localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(true));
+    } catch {}
+    notifyListeners();
+  }, []);
+
   return {
     isMuted: globalIsMuted,
     isPlaying: globalIsPlaying,
     toggleMute,
+    playMusic,
+    pauseMusic,
     playThwip,
     playClick,
     playSensePulse,
